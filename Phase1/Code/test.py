@@ -41,16 +41,79 @@ def detectCorners(imgs, choice):
     #remove the corner one
     return detected_corners, cmaps, corner_images
 
+def AdaptiveNonMaximalSuppression(images, C_maps, N_best):
+    imgs = images.copy()
+    anms_img = []
+    anms_corners = []
+    
+    for i, img in enumerate(imgs):
+        cmap = C_maps[i]
+        
+        # Find local maxima
+        local_maximas = peak_local_max(cmap, min_distance=15)
+        n_strong = local_maximas.shape[0]
+        
+        r = [np.Infinity for _ in range(n_strong)]
+        x = np.zeros((n_strong, 1), dtype=int)
+        y = np.zeros((n_strong, 1), dtype=int)
+        eu_dist = 0
+
+        # Compute suppression radius
+        for i in range(n_strong):
+            for j in range(n_strong):
+                x_j = local_maximas[j][0]
+                y_j = local_maximas[j][1]
+
+                x_i = local_maximas[i][0]
+                y_i = local_maximas[i][1]
+
+                if cmap[x_j, y_j] > cmap[x_i, y_i]:
+                    eu_dist = np.square(x_j - x_i) + np.square(y_j - y_i)
+                if r[i] > eu_dist:
+                    r[i] = eu_dist
+                    x[i] = x_j
+                    y[i] = y_j
+
+        # Sort by suppression radius
+        index = np.argsort(r)[::-1]  # Sort in descending order
+        index = index[:N_best]
+        
+        # Initialize best coordinates
+        N_best = min(N_best, x.shape[0])  # Handle cases where fewer maxima are found
+        x_best = np.zeros((N_best, 1), dtype=int)
+        y_best = np.zeros((N_best, 1), dtype=int)
+
+        for i in range(N_best):
+            x_best[i] = int(y[index[i]])  # Convert to Python int
+            y_best[i] = int(x[index[i]])  # Convert to Python int
+            cv2.circle(img, (int(x_best[i]), int(y_best[i])), 5, (0, 255, 0), -1)
+
+        # Concatenate and append results
+        anms_corner = np.hstack((x_best, y_best))
+        anms_corners.append(anms_corner)
+        anms_img.append(img)
+
+    return anms_corners, anms_img
+
+
 def main():
-    img = cv2.imread("/Users/rohin/Documents/Computer Vision/AutoPano/Phase1/Data/Train/Set1/1.jpg")
-    imgs = [img]
+    img1 = cv2.imread("/Users/rohin/Documents/Computer Vision/AutoPano/Phase1/Data/Train/Set1/1.jpg")
+    img2 = cv2.imread("/Users/rohin/Documents/Computer Vision/AutoPano/Phase1/Data/Train/Set1/2.jpg")
+    img3 = cv2.imread("/Users/rohin/Documents/Computer Vision/AutoPano/Phase1/Data/Train/Set1/3.jpg")
+    imgs = [img1, img2, img3]
     choice = 1
     detected_corners, cmaps, corner_images = detectCorners(imgs, choice)
-    print("Detected Corners: ", detected_corners)
-    print("Corner Maps: ", cmaps)
-    #Display corner image
-    cv2.imshow("Corner Image", corner_images[0])
-    cv2.waitKey(0)
+    
+    N_best = 500
+    anms_corners, anms_img = AdaptiveNonMaximalSuppression(corner_images, cmaps, N_best)
+    
+    #Create a test output folder if it does not exist and store the corner images and the ANMS images
+    if not os.path.exists("Test_Output"):
+        os.makedirs("Test_Output")
+
+    for i in range(len(corner_images)):
+        cv2.imwrite("Test_Output/corners" + str(i+1) + ".png", corner_images[i])
+        cv2.imwrite("Test_Output/anms" + str(i+1) + ".png", anms_img[i])
 
 if __name__ == "__main__":
     main()

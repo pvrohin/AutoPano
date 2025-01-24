@@ -16,34 +16,13 @@ Worcester Polytechnic Institute
 
 import numpy as np
 import cv2
+import os
+from skimage.feature import peak_local_max
+from scipy.ndimage import maximum_filter
 
 # Add any python libraries here
 
-# Corner Detection using Harris Corner Detection
-# def CornerDetection(img):
-#     # Convert the image to grayscale
-#     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-     
-#     # Detect corners using Harris Corner Detection
-#     corners = cv2.cornerHarris(gray, 2, 3, 0.001)
-     
-#     # Dilate corner image to enhance corner points
-#     corners = cv2.dilate(corners, None)
-    
-#     # Create a copy of the original image to display corners
-#     img_with_corners = img.copy()
-    
-#     # Display the corners on the image
-#     img_with_corners[corners > 0.01 * corners.max()] = [0, 0, 255]
-    
-#     cv2.imshow('corners', img_with_corners)
-#     cv2.waitKey(0)
-#     cv2.destroyAllWindows()
-     
-#     # Return the corners
-#     return corners
-
-def extract_corners(image, use_harris=True, block_size=2, ksize=3, k=0.001, num_corners=100):
+def extract_corners(image, use_harris=True, block_size=2, ksize=3, k=0.001, num_corners=1000):
     
     # Convert the image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -55,9 +34,11 @@ def extract_corners(image, use_harris=True, block_size=2, ksize=3, k=0.001, num_
     
         # Refine the corners by applying a threshold
         corners[corners < 0.001 * corners.max()] = 0
-        #corners = cv2.threshold(corners, 0.001 * corners.max(), 255, cv2.THRESH_BINARY)[1]
+    
         # Find the coordinates of the corners
         corner_coords = np.argwhere(corners > 0.01 * corners.max())
+        
+		# Convert the coordinates to a list of (x, y) tuples
         corner_coords = [corner[::-1] for corner in corner_coords]  # Reverse x-y order
 
     else:
@@ -78,6 +59,46 @@ def extract_corners(image, use_harris=True, block_size=2, ksize=3, k=0.001, num_
             cv2.circle(image_with_corners, (x, y), 3, (0, 0, 255), -1)
 
     return corners, corner_coords, image_with_corners
+
+# Perform Adaptive Non-Maximal Suppression (ANMS) to select the best corners from the detected corners
+def ANMS(image, corner_map, N_Best=500):
+
+    local_maxima = peak_local_max(corner_map, 15)
+
+    N_Strong = len(local_maxima)
+
+    r = [np.Inf for i in range(N_Strong)]
+
+    ED = 0
+
+    count = 0
+
+    for i in range(N_Strong):
+        for j in range(N_Strong):
+            if corner_map[local_maxima[i][0]][local_maxima[i][1]] < corner_map[local_maxima[j][0]][local_maxima[j][1]]:
+                ED = np.sqrt((local_maxima[i][0] - local_maxima[j][0])**2 + (local_maxima[i][1] - local_maxima[j][1])**2)
+            if ED < r[i]:
+                r[i] = ED
+                count += 1
+
+    if count < N_Best:
+        N_Best = count
+
+    #Sort the r list in descending order and get the N_Best corners without using zip function
+    N_Best_Corners = [local_maxima[i] for i in np.argsort(r)[::-1][:N_Best]]
+  
+    #print(N_Best_Corners)
+    
+    #Show the N_Best corners on the image
+    for i in range(len(N_Best_Corners)):
+       cv2.circle(image, (int(N_Best_Corners[i][1]), int(N_Best_Corners[i][0])), 3, (0, 0, 255), -1)
+    
+    # cv2.imshow("N_Best_Corners", image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # cv2.imwrite("N_Best_Corners.jpg", image)  
+
+    return N_Best_Corners
 
 def main(): 
     # Add any Command Line arguments here
@@ -105,13 +126,29 @@ def main():
     corners2, corner_coords2, image_with_corners2 = extract_corners(img2)
     corners3, corner_coords3, image_with_corners3 = extract_corners(img3)
     
-    print(corner_coords1)
-    print(corners1)
+	#Create an output folder if it does not exist
+    if not os.path.exists('Output'):
+        os.makedirs('Output')
+    
+    # Create an output folder and save the images with detected corners
+    cv2.imwrite('Output/corners1.png', image_with_corners1)
+    cv2.imwrite('Output/corners2.png', image_with_corners2)
+    cv2.imwrite('Output/corners3.png', image_with_corners3) 
     
     """
 	Perform ANMS: Adaptive Non-Maximal Suppression
 	Save ANMS output as anms.png
 	"""
+    
+	# Perform ANMS on the corner maps
+    N_Best_Corners1 = ANMS(image_with_corners1, corners1)
+    N_Best_Corners2 = ANMS(image_with_corners2, corners2)
+    N_Best_Corners3 = ANMS(image_with_corners3, corners3)
+    
+	#Store the ANMS output in the Output folder
+    cv2.imwrite('Output/anms1.png', image_with_corners1)
+    cv2.imwrite('Output/anms2.png', image_with_corners2)
+    cv2.imwrite('Output/anms3.png', image_with_corners3)
 
     """
 	Feature Descriptors

@@ -61,44 +61,56 @@ def extract_corners(image, use_harris=True, block_size=2, ksize=3, k=0.001, num_
     return corners, corner_coords, image_with_corners
 
 # Perform Adaptive Non-Maximal Suppression (ANMS) to select the best corners from the detected corners
-def ANMS(image, corner_map, N_Best=500):
+def ANMS(image, corner_map, N_Best=500, min_distance=15, radius_threshold=1e-3):
+    """
+    Adaptive Non-Maximal Suppression (ANMS) for corner detection.
+    
+    Parameters:
+        image (numpy.ndarray): The input image on which corners are drawn.
+        corner_map (numpy.ndarray): The corner strength map.
+        N_Best (int): The maximum number of corners to retain after suppression.
+        min_distance (int): Minimum distance between local maxima.
+        radius_threshold (float): Threshold for the suppression radius.
 
-    local_maxima = peak_local_max(corner_map, 15)
+    Returns:
+        list: N_Best corners as (x, y) coordinates.
+        numpy.ndarray: Image with the corners drawn.
+    """
+    # Normalize the corner map to ensure consistent scaling
+    corner_map = corner_map / corner_map.max()
 
+    # Apply a threshold to the corner map to remove weak corners
+    corner_map[corner_map < 0.01] = 0
+
+    # Find local maxima in the corner map
+    local_maxima = peak_local_max(corner_map, min_distance=min_distance)
     N_Strong = len(local_maxima)
 
-    r = [np.Inf for i in range(N_Strong)]
+    # Initialize suppression radius (r) with infinity
+    r = [np.Inf for _ in range(N_Strong)]
 
-    ED = 0
-
-    count = 0
-
+    # Calculate suppression radius for each local maxima
     for i in range(N_Strong):
         for j in range(N_Strong):
-            if corner_map[local_maxima[i][0]][local_maxima[i][1]] < corner_map[local_maxima[j][0]][local_maxima[j][1]]:
-                ED = np.sqrt((local_maxima[i][0] - local_maxima[j][0])**2 + (local_maxima[i][1] - local_maxima[j][1])**2)
-            if ED < r[i]:
-                r[i] = ED
-                count += 1
+            if corner_map[local_maxima[j][0], local_maxima[j][1]] > corner_map[local_maxima[i][0], local_maxima[i][1]]:
+                eu_dist = (local_maxima[j][0] - local_maxima[i][0])**2 + (local_maxima[j][1] - local_maxima[i][1])**2
+                r[i] = min(r[i], eu_dist)
 
-    if count < N_Best:
-        N_Best = count
+    # Filter corners based on suppression radius threshold
+    valid_indices = [i for i, radius in enumerate(r) if radius > radius_threshold]
+    sorted_indices = np.argsort(r)[::-1]  # Sort indices by descending radius
 
-    #Sort the r list in descending order and get the N_Best corners without using zip function
-    N_Best_Corners = [local_maxima[i] for i in np.argsort(r)[::-1][:N_Best]]
-  
-    #print(N_Best_Corners)
-    
-    #Show the N_Best corners on the image
-    for i in range(len(N_Best_Corners)):
-       cv2.circle(image, (int(N_Best_Corners[i][1]), int(N_Best_Corners[i][0])), 3, (0, 0, 255), -1)
-    
-    # cv2.imshow("N_Best_Corners", image)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    # cv2.imwrite("N_Best_Corners.jpg", image)  
+    # Select top N_Best corners
+    selected_indices = [i for i in sorted_indices if i in valid_indices][:N_Best]
+    N_Best_Corners = [local_maxima[i] for i in selected_indices]
 
-    return N_Best_Corners
+    # Draw the selected corners on the image
+    output_image = image.copy()
+    for corner in N_Best_Corners:
+        cv2.circle(output_image, (int(corner[1]), int(corner[0])), 3, (0, 255, 0), -1)
+
+    return N_Best_Corners, output_image
+
 
 def main(): 
     # Add any Command Line arguments here
@@ -141,9 +153,9 @@ def main():
 	"""
     
 	# Perform ANMS on the corner maps
-    N_Best_Corners1 = ANMS(image_with_corners1, corners1)
-    N_Best_Corners2 = ANMS(image_with_corners2, corners2)
-    N_Best_Corners3 = ANMS(image_with_corners3, corners3)
+    anms_corners1, image_with_corners1 = ANMS(img1, corners1)
+    anms_corners2, image_with_corners2 = ANMS(img2, corners2)
+    anms_corners3, image_with_corners3 = ANMS(img3, corners3)
     
 	#Store the ANMS output in the Output folder
     cv2.imwrite('Output/anms1.png', image_with_corners1)

@@ -111,6 +111,115 @@ def ANMS(image, corner_map, N_Best=500, min_distance=15, radius_threshold=1e-3):
 
     return N_Best_Corners, output_image
 
+# Extract feature descriptors from the detected corners
+def get_feature_descriptor(img, x, y):
+    # 1) Extract a 41×41 patch centered around (x, y)
+    size = 41
+    half = size // 2
+    patch = img[y-half:y+half+1, x-half:x+half+1]
+
+    # Handle boundary cases
+    if patch.shape[0] != size or patch.shape[1] != size:
+        return None  # or pad if needed
+
+    # 2) Apply Gaussian blur
+    blurred = cv2.GaussianBlur(patch, (5, 5), 0)
+
+    # 3) Sub-sample to 8×8
+    sub = cv2.resize(blurred, (8, 8), interpolation=cv2.INTER_AREA)
+
+    # 4) Reshape to 64×1
+    descriptor = sub.reshape(64).astype(np.float32)
+
+    # 5) Standardize (zero mean, unit variance)
+    mean, std = cv2.meanStdDev(descriptor)
+    descriptor = (descriptor - mean[0][0]) / (std[0][0] + 1e-6)
+
+    return descriptor
+
+def extract_feature_descriptors(image, corners):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    descriptors = []
+    for corner in corners:
+        x, y = int(corner[1]), int(corner[0])
+        descriptor = get_feature_descriptor(gray, x, y)
+        if descriptor is not None:
+            descriptors.append(descriptor)
+    return np.array(descriptors)
+
+def match_features(desc1, desc2, ratio_threshold=0.75):
+    matches = []
+    for i, d1 in enumerate(desc1):
+        distances = np.linalg.norm(desc2 - d1, axis=1)
+        if len(distances) < 2:
+            continue
+        sorted_indices = np.argsort(distances)
+        best_match = sorted_indices[0]
+        second_best_match = sorted_indices[1]
+        if distances[best_match] < ratio_threshold * distances[second_best_match]:
+            matches.append((i, best_match))
+    return matches
+
+def ransac_homography(matches, keypoints1, keypoints2, threshold=5.0, max_iterations=1000):
+    max_inliers = []
+    best_H = None
+
+    for _ in range(max_iterations):
+        # Randomly select 4 matches
+        sample_indices = np.random.choice(len(matches), 4, replace=False)
+        pts1 = np.float32([keypoints1[matches[i][0]].pt for i in sample_indices])
+        pts2 = np.float32([keypoints2[matches[i][1]].pt for i in sample_indices])
+
+        # Compute homography
+        H, _ = cv2.findHomography(pts1, pts2, 0)
+
+        # Compute inliers
+        inliers = []
+        for i, (m1, m2) in enumerate(matches):
+            pt1 = np.float32([keypoints1[m1].pt])
+            pt2 = np.float32([keypoints2[m2].pt])
+            projected_pt2 = cv2.perspectiveTransform(np.array([pt1]), H)[0][0]
+            ssd = np.sum((pt2 - projected_pt2) ** 2)
+            if ssd < threshold:
+                inliers.append((m1, m2))
+
+        # Update best homography if more inliers are found
+        if len(inliers) > len(max_inliers):
+            max_inliers = inliers
+            best_H = H
+
+        # Early exit if a sufficient number of inliers is found
+        if len(max_inliers) > 0.9 * len(matches):
+            break
+
+    # Recompute homography using all inliers
+    if best_H is not None:
+        pts1 = np.float32([keypoints1[m[0]].pt for m in max_inliers])
+        pts2 = np.float32([keypoints2[m[1]].pt for m in max_inliers])
+        best_H, _ = cv2.findHomography(pts1, pts2, 0)
+
+    return best_H, max_inliers
+
+def blend_images(img1, img2, H):
+    # Warp img2 to img1's plane
+    height1, width1 = img1.shape[:2]
+    height2, width2 = img2.shape[:2]
+
+    # Get the canvas dimesions
+    corners_img2 = np.float32([[0, 0], [0, height2], [width2, height2], [width2, 0]]).reshape(-1, 1, 2)
+    warped_corners_img2 = cv2.perspectiveTransform(corners_img2, H)
+    all_corners = np.concatenate((corners_img2, warped_corners_img2), axis=0)
+
+    [x_min, y_min] = np.int32(all_corners.min(axis=0).ravel() - 0.5)
+    [x_max, y_max] = np.int32(all_corners.max(axis=0).ravel() + 0.5)
+
+    translation_dist = [-x_min, -y_min]
+    H_translation = np.array([[1, 0, translation_dist[0]], [0, 1, translation_dist[1]], [0, 0, 1]])
+
+    output_img = cv2.warpPerspective(img2, H_translation.dot(H), (x_max - x_min, y_max - y_min))
+    output_img[translation_dist[1]:height1 + translation_dist[1], translation_dist[0]:width1 + translation_dist[0]] = img1
+
+    return output_img
 
 def main(): 
     # Add any Command Line arguments here
@@ -157,6 +266,12 @@ def main():
     anms_corners2, image_with_corners2 = ANMS(img2, corners2)
     anms_corners3, image_with_corners3 = ANMS(img3, corners3)
     
+    # Print size of image 1
+    print(img1.shape)
+
+
+    print(anms_corners1)
+    
 	#Store the ANMS output in the Output folder
     cv2.imwrite('Output/anms1.png', image_with_corners1)
     cv2.imwrite('Output/anms2.png', image_with_corners2)
@@ -166,20 +281,61 @@ def main():
 	Feature Descriptors
 	Save Feature Descriptor output as FD.png
 	"""
+    # Extract feature descriptors for the detected corners
+    descriptors1 = extract_feature_descriptors(img1, anms_corners1)
+    descriptors2 = extract_feature_descriptors(img2, anms_corners2)
+    descriptors3 = extract_feature_descriptors(img3, anms_corners3)
 
     """
 	Feature Matching
 	Save Feature Matching output as matching.png
 	"""
+    matches = match_features(descriptors1, descriptors2)
+
+    keypoints1 = [cv2.KeyPoint(float(c[1]), float(c[0]), 1) for c in anms_corners1]
+    keypoints2 = [cv2.KeyPoint(float(c[1]), float(c[0]), 1) for c in anms_corners2]
+
+    good_matches = [cv2.DMatch(m[0], m[1], 0) for m in matches]
+
+    matched_image = cv2.drawMatches(img1, keypoints1, img2, keypoints2, good_matches, None)
+
+    cv2.imshow('Matches', matched_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    cv2.imwrite('Output/matching.png', matched_image)
 
     """
 	Refine: RANSAC, Estimate Homography
 	"""
+    # RANSAC for homography
+    H, inliers = ransac_homography(matches, keypoints1, keypoints2)
+
+    print("Homography Matrix:\n", H)
+    print("Number of inliers:", len(inliers))
+
+    # Visualize inliers
+    inlier_matches = [cv2.DMatch(m[0], m[1], 0) for m in inliers]
+    inlier_image = cv2.drawMatches(img1, keypoints1, img2, keypoints2, inlier_matches, None)
+
+    cv2.imshow('Inliers', inlier_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    cv2.imwrite('Output/inliers.png', inlier_image)
 
     """
 	Image Warping + Blending
 	Save Panorama output as mypano.png
 	"""
+    # Blend images to create panorama
+    panorama = blend_images(img1, img2, H)
+
+    cv2.imshow('Panorama', panorama)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    cv2.imwrite('Output/mypano.png', panorama)
 
 
 if __name__ == "__main__":

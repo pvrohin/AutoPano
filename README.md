@@ -58,11 +58,11 @@ Detects corners in both images using either Harris or Shi-Tomasi corner detectio
 
 **Harris Corner Detection Examples:**
 - Image 1 & 2:
-![Harris Corners 1-2](results/corners_harris_1_2.jpg)
+![Harris Corners 1-2]([results/corners_harris_1_2.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_0.png))
 - Image 2 & 3:
-![Harris Corners 2-3](results/corners_harris_2_3.jpg)
+![Harris Corners 2-3]([results/corners_harris_2_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_1.png))
 - Image 1 & 3:
-![Harris Corners 1-3](results/corners_harris_1_3.jpg)
+![Harris Corners 1-3]([results/corners_harris_1_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_2.png))
 
 **Shi-Tomasi Corner Detection Examples:**
 - Image 1 & 2:
@@ -77,11 +77,11 @@ Selects the most distinctive corners while maintaining good spatial distribution
 
 **ANMS Results:**
 - Image 1 & 2:
-![ANMS Corners 1-2](results/anms_corners_1_2.jpg)
+![ANMS Corners 1-2]([results/anms_corners_1_2.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_0.png))
 - Image 2 & 3:
-![ANMS Corners 2-3](results/anms_corners_2_3.jpg)
+![ANMS Corners 2-3]([results/anms_corners_2_3.jp](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_1.png)g)
 - Image 1 & 3:
-![ANMS Corners 1-3](results/anms_corners_1_3.jpg)
+![ANMS Corners 1-3]([results/anms_corners_1_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_2.png))
 
 ### 3. Feature Descriptor Extraction
 Extracts 8x8 feature descriptors around each corner, applies Gaussian blur and normalization.
@@ -91,35 +91,29 @@ Matches features between images using ratio test.
 
 **Feature Matches:**
 - Image 1 & 2:
-![Feature Matches 1-2](results/feature_matches_1_2.jpg)
+![Feature Matches 1-2]([results/feature_matches_1_2.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/feature_matched_image_0.png))
 - Image 2 & 3:
-![Feature Matches 2-3](results/feature_matches_2_3.jpg)
-- Image 1 & 3:
-![Feature Matches 1-3](results/feature_matches_1_3.jpg)
+![Feature Matches 2-3]([results/feature_matches_2_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/feature_matched_image_1.png))
 
 ### 5. Homography Estimation
 Uses RANSAC to estimate the best homography matrix.
 
 **RANSAC Inlier Matches:**
 - Image 1 & 2:
-![RANSAC Matches 1-2](results/ransac_matches_1_2.jpg)
+![RANSAC Matches 1-2]([results/ransac_matches_1_2.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/ransac_image_0.png))
 - Image 2 & 3:
-![RANSAC Matches 2-3](results/ransac_matches_2_3.jpg)
-- Image 1 & 3:
-![RANSAC Matches 1-3](results/ransac_matches_1_3.jpg)
+![RANSAC Matches 2-3]([results/ransac_matches_2_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/ransac_image_1.png))
 
 ### 6. Image Warping and Blending
 Warps and blends the images using the estimated homography.
 
 **Final Panoramas:**
 - Images 1 & 2:
-![Panorama 1-2](results/panorama_1_2.jpg)
+![Panorama 1-2]([results/panorama_1_2.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/pano_image_0.png))
 - Images 2 & 3:
-![Panorama 2-3](results/panorama_2_3.jpg)
-- Images 1 & 3:
-![Panorama 1-3](results/panorama_1_3.jpg)
+![Panorama 2-3]([results/panorama_2_3.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/pano_image_1.png))
 - Complete Panorama (All three images):
-![Complete Panorama](results/complete_panorama.jpg)
+![Complete Panorama]([results/complete_panorama.jpg](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_1.png))
 
 ## Output Files
 

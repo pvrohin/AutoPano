@@ -51,42 +51,86 @@ python Wrapper.py --image1 path/to/image1.jpg --image2 path/to/image2.jpg
 - `--num_corners`: Number of corners to detect (default: 1000)
 - `--N_best`: Number of best corners to keep after ANMS (default: 400)
 
-## Pipeline Overview
+## Pipeline Overview and Results
 
-1. **Corner Detection**
-   - Detects corners in both images using either Harris or Shi-Tomasi corner detection
-   - Output: Corner-marked images showing detected corners
+### 1. Corner Detection
+Detects corners in both images using either Harris or Shi-Tomasi corner detection.
 
-2. **Adaptive Non-Maximal Suppression (ANMS)**
-   - Selects the most distinctive corners while maintaining good spatial distribution
-   - Output: Images with selected corners marked
+**Harris Corner Detection Examples:**
+- Image 1 & 2:
+![Harris Corners 1-2](results/corners_harris_1_2.jpg)
+- Image 2 & 3:
+![Harris Corners 2-3](results/corners_harris_2_3.jpg)
+- Image 1 & 3:
+![Harris Corners 1-3](results/corners_harris_1_3.jpg)
 
-3. **Feature Descriptor Extraction**
-   - Extracts 8x8 feature descriptors around each corner
-   - Applies Gaussian blur and normalization
-   - Output: Feature vectors for each corner
+**Shi-Tomasi Corner Detection Examples:**
+- Image 1 & 2:
+![Shi-Tomasi Corners 1-2](results/corners_shi_tomasi_1_2.jpg)
+- Image 2 & 3:
+![Shi-Tomasi Corners 2-3](results/corners_shi_tomasi_2_3.jpg)
+- Image 1 & 3:
+![Shi-Tomasi Corners 1-3](results/corners_shi_tomasi_1_3.jpg)
 
-4. **Feature Matching**
-   - Matches features between images using ratio test
-   - Output: Matched features visualization
+### 2. Adaptive Non-Maximal Suppression (ANMS)
+Selects the most distinctive corners while maintaining good spatial distribution.
 
-5. **Homography Estimation**
-   - Uses RANSAC to estimate the best homography matrix
-   - Output: Best homography matrix and inlier matches
+**ANMS Results:**
+- Image 1 & 2:
+![ANMS Corners 1-2](results/anms_corners_1_2.jpg)
+- Image 2 & 3:
+![ANMS Corners 2-3](results/anms_corners_2_3.jpg)
+- Image 1 & 3:
+![ANMS Corners 1-3](results/anms_corners_1_3.jpg)
 
-6. **Image Warping and Blending**
-   - Warps and blends the images using the estimated homography
-   - Output: Final stitched panorama
+### 3. Feature Descriptor Extraction
+Extracts 8x8 feature descriptors around each corner, applies Gaussian blur and normalization.
 
-## Output Visualization
+### 4. Feature Matching
+Matches features between images using ratio test.
 
-The program generates several output images showing the results of each step:
+**Feature Matches:**
+- Image 1 & 2:
+![Feature Matches 1-2](results/feature_matches_1_2.jpg)
+- Image 2 & 3:
+![Feature Matches 2-3](results/feature_matches_2_3.jpg)
+- Image 1 & 3:
+![Feature Matches 1-3](results/feature_matches_1_3.jpg)
 
-1. `corners_harris.jpg` or `corners_shi_tomasi.jpg`: Shows detected corners
-2. `anms_corners.jpg`: Shows corners after ANMS
-3. `feature_matches.jpg`: Shows matched features between images
-4. `ransac_matches.jpg`: Shows inlier matches after RANSAC
-5. `panorama.jpg`: Final stitched panorama
+### 5. Homography Estimation
+Uses RANSAC to estimate the best homography matrix.
+
+**RANSAC Inlier Matches:**
+- Image 1 & 2:
+![RANSAC Matches 1-2](results/ransac_matches_1_2.jpg)
+- Image 2 & 3:
+![RANSAC Matches 2-3](results/ransac_matches_2_3.jpg)
+- Image 1 & 3:
+![RANSAC Matches 1-3](results/ransac_matches_1_3.jpg)
+
+### 6. Image Warping and Blending
+Warps and blends the images using the estimated homography.
+
+**Final Panoramas:**
+- Images 1 & 2:
+![Panorama 1-2](results/panorama_1_2.jpg)
+- Images 2 & 3:
+![Panorama 2-3](results/panorama_2_3.jpg)
+- Images 1 & 3:
+![Panorama 1-3](results/panorama_1_3.jpg)
+- Complete Panorama (All three images):
+![Complete Panorama](results/complete_panorama.jpg)
+
+## Output Files
+
+The program generates the following output files in the `results` directory for each image pair:
+
+1. `corners_harris_X_Y.jpg` or `corners_shi_tomasi_X_Y.jpg`: Shows detected corners for images X and Y
+2. `anms_corners_X_Y.jpg`: Shows corners after ANMS for images X and Y
+3. `feature_matches_X_Y.jpg`: Shows matched features between images X and Y
+4. `ransac_matches_X_Y.jpg`: Shows inlier matches after RANSAC for images X and Y
+5. `panorama_X_Y.jpg`: Stitched panorama for images X and Y
+6. `complete_panorama.jpg`: Final panorama combining all three images
 
 ## Example
 

@@ -36,19 +36,12 @@ pip install -r requirements.txt
 
 ### Basic Usage
 ```bash
-python Wrapper.py --image1 path/to/image1.jpg --image2 path/to/image2.jpg
+python Wrapper.py --path to images
 ```
 
 ### Command Line Arguments
 
-- `--image1`: Path to the first input image  
-- `--image2`: Path to the second input image  
-- `--use_harris`: Use Harris corner detection (default: True)  
-- `--block_size`: Block size for corner detection (default: 2)  
-- `--ksize`: Aperture parameter for corner detection (default: 3)  
-- `--k`: Harris detector free parameter (default: 0.04)  
-- `--num_corners`: Number of corners to detect (default: 1000)  
-- `--N_best`: Number of best corners to keep after ANMS (default: 400)  
+- `--path to images`: Path to the directory containing all the images  
 
 ## Pipeline Overview and Results
 
@@ -56,33 +49,25 @@ python Wrapper.py --image1 path/to/image1.jpg --image2 path/to/image2.jpg
 
 Detects corners in both images using either Harris or Shi-Tomasi corner detection.
 
-**Harris Corner Detection Examples:**
-- Image 1 & 2:  
+**Corner Detection Examples:**
+- Image 1:  
   ![Harris Corners 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_0.png?raw=true)
-- Image 2 & 3:  
+- Image 2:  
   ![Harris Corners 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_1.png?raw=true)
-- Image 1 & 3:  
-  ![Harris Corners 1-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_2.png?raw=true)
-
-**Shi-Tomasi Corner Detection Examples:**
-- Image 1 & 2:  
-  ![Shi-Tomasi Corners 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/corners_shi_tomasi_1_2.jpg?raw=true)
-- Image 2 & 3:  
-  ![Shi-Tomasi Corners 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/corners_shi_tomasi_2_3.jpg?raw=true)
-- Image 1 & 3:  
-  ![Shi-Tomasi Corners 1-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/corners_shi_tomasi_1_3.jpg?raw=true)
+- Image 3:  
+  ![Harris Corners 1-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_3.png?raw=true)
 
 ### 2. Adaptive Non-Maximal Suppression (ANMS)
 
 Selects the most distinctive corners while maintaining good spatial distribution.
 
 **ANMS Results:**
-- Image 1 & 2:  
+- Image 1:  
   ![ANMS Corners 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_0.png?raw=true)
-- Image 2 & 3:  
+- Image 2:  
   ![ANMS Corners 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_1.png?raw=true)
-- Image 1 & 3:  
-  ![ANMS Corners 1-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_2.png?raw=true)
+- Image 3:  
+  ![ANMS Corners 1-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/anms_images_3.png?raw=true)
 
 ### 3. Feature Descriptor Extraction
 
@@ -95,7 +80,7 @@ Matches features between images using ratio test.
 **Feature Matches:**
 - Image 1 & 2:  
   ![Feature Matches 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/feature_matched_image_0.png?raw=true)
-- Image 2 & 3:  
+- Image 1 & 2 & 3:  
   ![Feature Matches 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/feature_matched_image_1.png?raw=true)
 
 ### 5. Homography Estimation
@@ -105,7 +90,7 @@ Uses RANSAC to estimate the best homography matrix.
 **RANSAC Inlier Matches:**
 - Image 1 & 2:  
   ![RANSAC Matches 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/ransac_image_0.png?raw=true)
-- Image 2 & 3:  
+- Image 1& 2 & 3:  
   ![RANSAC Matches 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/ransac_image_1.png?raw=true)
 
 ### 6. Image Warping and Blending
@@ -115,10 +100,8 @@ Warps and blends the images using the estimated homography.
 **Final Panoramas:**
 - Images 1 & 2:  
   ![Panorama 1-2](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/pano_image_0.png?raw=true)
-- Images 2 & 3:  
-  ![Panorama 2-3](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/pano_image_1.png?raw=true)
 - Complete Panorama (All three images):  
-  ![Complete Panorama](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/corner_images_1.png?raw=true)
+  ![Complete Panorama](https://github.com/pvrohin/AutoPano/blob/master/Phase1/Code/Results/Train/Set1/pano_image_1.png?raw=true)
 
 ## Output Files
 

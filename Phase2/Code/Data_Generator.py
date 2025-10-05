@@ -1,59 +1,43 @@
-#Load an image from Data folder
 import cv2
 import os
 import random
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
-image_path = os.path.join('../Data/Train/1.jpg')
-image = cv2.imread(image_path)
-print(image.shape)
-
-#Make the image of a standard size applicable to all images in the dataset
-image = cv2.resize(image, (320, 240), interpolation = cv2.INTER_AREA)
-print(image.shape)
-
-#Display the image
-# cv2.imshow('Image', image)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
-
-patch_size = 128  # MP × NP
-pixel_shift_limit = 32  # ρ (maximum perturbation)
-border_margin = 42  # Additional safety margin
-
-h, w = image.shape[:2]  # M × N
-
-# Calculate safe extraction bounds considering maximum perturbation
-# The patch needs to be extracted from a region that, after maximum perturbation ρ,
-# will still lie completely within the image boundaries
-min_x = pixel_shift_limit  # Left boundary: at least ρ pixels from left edge
-min_y = pixel_shift_limit  # Top boundary: at least ρ pixels from top edge
-max_x = w - patch_size - pixel_shift_limit  # Right boundary: patch + ρ pixels from right edge
-max_y = h - patch_size - pixel_shift_limit  # Bottom boundary: patch + ρ pixels from bottom edge
-
-# Ensure we have valid bounds
-if max_x <= min_x or max_y <= min_y:
-    print("Error: Image too small for patch extraction with given perturbation")
-    print(f"Required minimum size: {patch_size + 2 * pixel_shift_limit} × {patch_size + 2 * pixel_shift_limit}")
-    print(f"Actual image size: {w} × {h}")
-else:
+def generate_patch_pair(image, patch_size=128, pixel_shift_limit=32, border_margin=42):
+    """
+    Generate a pair of patches (PA, PB) and their homography from a single image.
+    
+    Args:
+        image: Input image
+        patch_size: Size of patches to extract
+        pixel_shift_limit: Maximum perturbation radius
+        border_margin: Safety margin from image boundaries
+    
+    Returns:
+        stacked_patches: Stacked patches PA and PB (MP × NP × 2K)
+        H4Pt_flat: Flattened 4-point homography (8 values)
+        success: Boolean indicating if generation was successful
+    """
+    h, w = image.shape[:2]  # M × N
+    
+    # Calculate safe extraction bounds considering maximum perturbation
+    min_x = pixel_shift_limit
+    min_y = pixel_shift_limit
+    max_x = w - patch_size - pixel_shift_limit
+    max_y = h - patch_size - pixel_shift_limit
+    
+    # Check if image is large enough
+    if max_x <= min_x or max_y <= min_y:
+        return None, None, False
+    
     # Extract random patch from the safe region
     patch_x = random.randint(min_x, max_x)
     patch_y = random.randint(min_y, max_y)
     patch = image[patch_y:patch_y + patch_size, patch_x:patch_x + patch_size]
     
-    print(f"Patch extracted from: ({patch_x}, {patch_y}) to ({patch_x + patch_size}, {patch_y + patch_size})")
-    print(f"Safe extraction region: x∈[{min_x}, {max_x}], y∈[{min_y}, {max_y}]")
-    
-    # Demonstrate why these bounds are necessary
-    print(f"\nExplanation:")
-    print(f"- Original patch corner: ({patch_x}, {patch_y})")
-    print(f"- After maximum perturbation +ρ: ({patch_x + pixel_shift_limit}, {patch_y + pixel_shift_limit})")
-    print(f"- After maximum perturbation -ρ: ({patch_x - pixel_shift_limit}, {patch_y - pixel_shift_limit})")
-    print(f"- This ensures the warped patch stays within image bounds [0, {w}] × [0, {h}]")
-    
-    # Step 1: Define corner points of patch PA in image IA
-    # Corner points: (top-left, top-right, bottom-left, bottom-right)
+    # Define corner points of patch PA
     pts_A = np.array([
         [patch_x, patch_y],                           # top-left
         [patch_x + patch_size, patch_y],              # top-right  
@@ -61,188 +45,147 @@ else:
         [patch_x + patch_size, patch_y + patch_size]  # bottom-right
     ], dtype=np.float32)
     
-    print(f"\nOriginal corner points of PA:")
-    print(f"Top-left: ({pts_A[0][0]}, {pts_A[0][1]})")
-    print(f"Top-right: ({pts_A[1][0]}, {pts_A[1][1]})")
-    print(f"Bottom-left: ({pts_A[2][0]}, {pts_A[2][1]})")
-    print(f"Bottom-right: ({pts_A[3][0]}, {pts_A[3][1]})")
-    
-    # Step 2: Add random perturbation to corner points
-    # Add both individual perturbations and a common translation
+    # Add random perturbation to corner points
     common_translation_x = random.randint(-pixel_shift_limit, pixel_shift_limit)
     common_translation_y = random.randint(-pixel_shift_limit, pixel_shift_limit)
     
     pts_B = np.zeros_like(pts_A)
-    
     for i in range(4):
-        # Individual perturbation for each corner
         individual_perturbation_x = random.randint(-pixel_shift_limit, pixel_shift_limit)
         individual_perturbation_y = random.randint(-pixel_shift_limit, pixel_shift_limit)
         
-        # Total perturbation = individual + common translation
         pts_B[i][0] = pts_A[i][0] + individual_perturbation_x + common_translation_x
         pts_B[i][1] = pts_A[i][1] + individual_perturbation_y + common_translation_y
     
-    print(f"\nPerturbed corner points of PB:")
-    print(f"Top-left: ({pts_B[0][0]}, {pts_B[0][1]})")
-    print(f"Top-right: ({pts_B[1][0]}, {pts_B[1][1]})")
-    print(f"Bottom-left: ({pts_B[2][0]}, {pts_B[2][1]})")
-    print(f"Bottom-right: ({pts_B[3][0]}, {pts_B[3][1]})")
-    print(f"Common translation: ({common_translation_x}, {common_translation_y})")
-    
-    # Step 3: Calculate homography H_AB from PA to PB
+    # Calculate homography and warp image
     H_AB = cv2.getPerspectiveTransform(pts_A, pts_B)
-    print(f"\nHomography H_AB (PA -> PB):")
-    print(H_AB)
-    
-    # Step 4: Calculate inverse homography H_BA = H_AB^(-1)
-    H_BA = np.linalg.inv(H_AB)
-    print(f"\nInverse homography H_BA (PB -> PA):")
-    print(H_BA)
-    
-    # Step 5: Warp the entire image IA using H_AB to get image IB
-    # H_AB transforms points from PA to PB, so it warps IA to IB
     image_B = cv2.warpPerspective(image, H_AB, (w, h))
     
-    # Step 6: Extract patch PB from the same location in warped image IB
-    # Since we used H_AB to warp the image, patch PA in IA becomes patch PB in IB
+    # Extract patch PB from warped image
     patch_B = image_B[patch_y:patch_y + patch_size, patch_x:patch_x + patch_size]
     
-    print(f"\nExtracted patches:")
-    print(f"Patch PA shape: {patch.shape}")
-    print(f"Patch PB shape: {patch_B.shape}")
-    
-    # Verification: Check that the warped patch corners match our target
-    print(f"\nVerification - Warped patch corners should match pts_B:")
-    warped_corners = np.array([
-        [patch_x, patch_y],
-        [patch_x + patch_size, patch_y],
-        [patch_x, patch_y + patch_size],
-        [patch_x + patch_size, patch_y + patch_size]
-    ], dtype=np.float32)
-    
-    # Transform these corners using H_AB
-    warped_corners_homogeneous = np.hstack([warped_corners, np.ones((4, 1))])
-    transformed_corners = (H_AB @ warped_corners_homogeneous.T).T
-    transformed_corners = transformed_corners[:, :2] / transformed_corners[:, 2:3]
-    
-    print(f"Original corners in IA: {warped_corners}")
-    print(f"Transformed corners in IB: {transformed_corners}")
-    print(f"Target corners (pts_B): {pts_B}")
-    print(f"Match: {np.allclose(transformed_corners, pts_B, atol=1e-6)}")
-    
-    # Step 7: Calculate H4Pt (the 4-point homography representation)
-    # H4Pt = CB - CA represents the displacement of the 4 corner points
-    # This is the ground truth label for training the network
+    # Calculate H4Pt (4-point homography)
     H4Pt = (pts_B - pts_A).astype(np.float32)
-    print(f"\nH4Pt (4-point homography ground truth):")
-    print(f"Displacement vectors (CB - CA):")
-    for i, (pt_a, pt_b) in enumerate(zip(pts_A, pts_B)):
-        displacement = pt_b - pt_a
-        print(f"Corner {i+1}: ({displacement[0]:.2f}, {displacement[1]:.2f})")
+    H4Pt_flat = H4Pt.flatten()
     
-    # Step 8: Stack patches PA and PB depthwise to create input tensor
-    # Input shape: MP × NP × 2K where K=3 for RGB images
-    K = patch.shape[2] if len(patch.shape) == 3 else 1  # Number of channels
+    # Stack patches depthwise
+    K = patch.shape[2] if len(patch.shape) == 3 else 1
+    stacked_patches = np.dstack([patch, patch_B])
     
-    if len(patch.shape) == 3:  # RGB image
-        stacked_patches = np.dstack([patch, patch_B])  # Stack along depth axis
-    else:  # Grayscale image
-        stacked_patches = np.dstack([patch, patch_B])  # Stack along depth axis
-    
-    print(f"\nStacked patches shape: {stacked_patches.shape}")
-    print(f"Expected shape: {patch_size} × {patch_size} × {2*K}")
-    print(f"K (channels per patch): {K}")
-    
-    # Step 9: Flatten H4Pt to 1D array for training (8 values: 4 corners × 2 coordinates)
-    H4Pt_flat = H4Pt.flatten()  # Shape: (8,)
-    print(f"\nH4Pt flattened shape: {H4Pt_flat.shape}")
-    print(f"H4Pt flattened values: {H4Pt_flat}")
-    
-    # Step 10: Prepare final training data
-    print(f"\nFinal training data:")
-    print(f"Input (stacked patches): {stacked_patches.shape}")
-    print(f"Labels (H4Pt): {H4Pt_flat.shape}")
-    print(f"Ground truth homography matrix H_AB shape: {H_AB.shape}")
-    print(f"Ground truth homography matrix H_BA shape: {H_BA.shape}")
-    
-    # Step 11: Validation - Verify that H4Pt can reconstruct the homography
-    # This is useful for understanding the relationship between 4-point and matrix representations
-    print(f"\nValidation - Reconstructing homography from H4Pt:")
-    print(f"H4Pt represents the displacement of 4 corner points")
-    print(f"These 4 point correspondences can be used to compute the full homography matrix")
-    
-    # Optional: Show how to convert back from H4Pt to homography matrix
-    reconstructed_H_AB = cv2.getPerspectiveTransform(pts_A, pts_A + H4Pt)
-    print(f"Reconstructed H_AB from H4Pt matches original: {np.allclose(H_AB, reconstructed_H_AB, atol=1e-6)}")
-    
-    # Step 12: Training data summary
-    print(f"\n" + "="*50)
-    print(f"TRAINING DATA SUMMARY")
-    print(f"="*50)
-    print(f"Input tensor shape: {stacked_patches.shape}")
-    print(f"  - Height: {stacked_patches.shape[0]} pixels")
-    print(f"  - Width: {stacked_patches.shape[1]} pixels") 
-    print(f"  - Channels: {stacked_patches.shape[2]} (2 patches × {K} channels each)")
-    print(f"")
-    print(f"Label tensor shape: {H4Pt_flat.shape}")
-    print(f"  - 8 values representing (x,y) displacement for 4 corners")
-    print(f"  - Order: [x1, y1, x2, y2, x3, y3, x4, y4]")
-    print(f"  - Where (x1,y1) is top-left, (x2,y2) is top-right, etc.")
-    print(f"")
-    print(f"Network will learn: stacked_patches → H4Pt_flat")
-    print(f"Then convert H4Pt_flat → full homography matrix for applications")
-    print(f"="*50)
+    return stacked_patches, H4Pt_flat, True
 
-    # Step 13: Create visualization showing corner points
-    # Create a copy of the image for visualization
-    vis_image = image.copy()
+def generate_dataset(data_type='Train', num_patches_per_image=5):
+    """
+    Generate dataset for a specific data type (Train/Val).
     
-    # Draw original patch corners in green
-    for pt in pts_A:
-        cv2.circle(vis_image, (int(pt[0]), int(pt[1])), 5, (0, 255, 0), -1)
+    Args:
+        data_type: 'Train' or 'Val'
+        num_patches_per_image: Number of patches to generate per image
     
-    # Draw perturbed patch corners in red
-    for pt in pts_B:
-        cv2.circle(vis_image, (int(pt[0]), int(pt[1])), 5, (0, 0, 255), -1)
+    Returns:
+        all_stacked_patches: List of stacked patches
+        all_H4Pt: List of H4Pt labels
+        all_image_names: List of corresponding image names
+    """
+    print(f"Generating {data_type} dataset...")
     
-    # Draw lines connecting corresponding corners
-    for i in range(4):
-        cv2.line(vis_image, 
-                (int(pts_A[i][0]), int(pts_A[i][1])), 
-                (int(pts_B[i][0]), int(pts_B[i][1])), 
-                (255, 0, 0), 2)
+    # Set up paths
+    if data_type == 'Train':
+        image_path = '../Data/Train/'
+        save_path = '../Data/Train_synthetic/'
+        num_images = 5000  # Adjust based on your dataset
+    else:  # Val
+        image_path = '../Data/Val/'
+        save_path = '../Data/Val_synthetic/'
+        num_images = 1000  # Adjust based on your dataset
     
-    # Draw rectangle around original patch
-    cv2.rectangle(vis_image, 
-                 (int(pts_A[0][0]), int(pts_A[0][1])), 
-                 (int(pts_A[3][0]), int(pts_A[3][1])), 
-                 (0, 255, 0), 2)
+    # Create output directory
+    os.makedirs(save_path, exist_ok=True)
+    os.makedirs(save_path + 'PA/', exist_ok=True)
+    os.makedirs(save_path + 'PB/', exist_ok=True)
+    os.makedirs(save_path + 'IA/', exist_ok=True)
     
-    # Draw rectangle around perturbed patch
-    cv2.rectangle(vis_image, 
-                 (int(pts_B[0][0]), int(pts_B[0][1])), 
-                 (int(pts_B[3][0]), int(pts_B[3][1])), 
-                 (0, 0, 255), 2)
+    all_stacked_patches = []
+    all_H4Pt = []
+    all_image_names = []
+    
+    successful_patches = 0
+    failed_patches = 0
+    
+    # Process each image
+    for img_idx in tqdm(range(1, num_images + 1), desc=f"Processing {data_type} images"):
+        image_file = f'{img_idx}.jpg'
+        image_path_full = os.path.join(image_path, image_file)
+        
+        if not os.path.exists(image_path_full):
+            continue
+            
+        # Load and resize image
+        image = cv2.imread(image_path_full)
+        if image is None:
+            continue
+            
+        image = cv2.resize(image, (320, 240), interpolation=cv2.INTER_AREA)
+        
+        # Generate multiple patches per image
+        for patch_idx in range(num_patches_per_image):
+            stacked_patches, H4Pt_flat, success = generate_patch_pair(image)
+            
+            if success:
+                # Save individual patches
+                patch_name = f'{img_idx}_{patch_idx}.jpg'
+                cv2.imwrite(os.path.join(save_path, 'PA', patch_name), stacked_patches[:, :, :3])
+                cv2.imwrite(os.path.join(save_path, 'PB', patch_name), stacked_patches[:, :, 3:])
+                cv2.imwrite(os.path.join(save_path, 'IA', patch_name), image)
+                
+                # Store data
+                all_stacked_patches.append(stacked_patches)
+                all_H4Pt.append(H4Pt_flat)
+                all_image_names.append(patch_name)
+                
+                successful_patches += 1
+            else:
+                failed_patches += 1
+    
+    print(f"Generated {successful_patches} successful patches, {failed_patches} failed patches")
+    
+    # Save data
+    if all_stacked_patches:
+        # Save stacked patches as numpy array
+        stacked_patches_array = np.array(all_stacked_patches)
+        np.save(os.path.join(save_path, 'stacked_patches.npy'), stacked_patches_array)
+        
+        # Save H4Pt labels
+        H4Pt_array = np.array(all_H4Pt)
+        np.save(os.path.join(save_path, 'H4Pt_labels.npy'), H4Pt_array)
+        
+        # Save as CSV for easy loading
+        df_H4Pt = pd.DataFrame(H4Pt_array, columns=[f'corner_{i//2}_{"x" if i%2==0 else "y"}' for i in range(8)])
+        df_H4Pt.to_csv(os.path.join(save_path, 'H4Pt_labels.csv'), index=False)
+        
+        # Save image names
+        df_names = pd.DataFrame(all_image_names, columns=['image_name'])
+        df_names.to_csv(os.path.join(save_path, 'image_names.csv'), index=False)
+        
+        print(f"Saved {len(all_stacked_patches)} patch pairs to {save_path}")
+        print(f"Stacked patches shape: {stacked_patches_array.shape}")
+        print(f"H4Pt labels shape: {H4Pt_array.shape}")
+    
+    return all_stacked_patches, all_H4Pt, all_image_names
 
-#Display the patches and visualization
-    # Step 14: Demonstrate how this data would be used in training
-    print(f"\n" + "="*50)
-    print(f"TRAINING USAGE EXAMPLE")
-    print(f"="*50)
-    print(f"# In your training loop, you would use:")
-    print(f"# X_train = stacked_patches  # Shape: (batch_size, 128, 128, 6)")
-    print(f"# y_train = H4Pt_flat       # Shape: (batch_size, 8)")
-    print(f"#")
-    print(f"# model.fit(X_train, y_train)")
-    print(f"#")
-    print(f"# After training, to use the predicted H4Pt:")
-    print(f"# predicted_H4Pt = model.predict(stacked_patches)")
-    print(f"# predicted_H = cv2.getPerspectiveTransform(pts_A, pts_A + predicted_H4Pt.reshape(4,2))")
-    print(f"="*50)
+def main():
+    """Main function to generate complete dataset."""
+    print("Starting dataset generation...")
+    
+    # Generate training data
+    train_patches, train_labels, train_names = generate_dataset('Train', num_patches_per_image=5)
+    
+    # Generate validation data
+    val_patches, val_labels, val_names = generate_dataset('Val', num_patches_per_image=5)
+    
+    print("\nDataset generation complete!")
+    print(f"Training data: {len(train_patches)} patch pairs")
+    print(f"Validation data: {len(val_patches)} patch pairs")
 
-cv2.imshow('Patch PA (Original)', patch)
-cv2.imshow('Patch PB (Warped)', patch_B)
-cv2.imshow('Corner Point Visualization', vis_image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+if __name__ == '__main__':
+    main()

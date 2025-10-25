@@ -39,7 +39,7 @@ def SetupAll(BasePath, CheckPointPath):
     # Setup DirNames
     DirNamesTrain = SetupDirNames(BasePath)
 
-    # Read and Setup Labels
+    # Read and Setup Labels (homography coordinates)
     LabelsPathTrain = './TxtFiles/LabelsTrain.txt'
     TrainLabels = ReadLabels(LabelsPathTrain)
 
@@ -52,8 +52,8 @@ def SetupAll(BasePath, CheckPointPath):
     # Number of passes of Val data with MiniBatchSize
     NumTestRunsPerEpoch = 5
 
-    # Image Input Shape
-    ImageSize = [32, 32, 3]
+    # Image Input Shape (height, width, channels) - for homography estimation
+    ImageSize = [128, 128, 2]  # 2 channels for original and warped images
     NumTrainSamples = len(DirNamesTrain)
 
     # Number of classes
@@ -77,6 +77,8 @@ def ReadLabels(LabelsPathTrain):
         TrainLabels = open(LabelsPathTrain, "r")
         TrainLabels = TrainLabels.read()
         TrainLabels = list(map(float, TrainLabels.split()))
+        # Reshape to (num_samples, 8) for homography coordinates
+        TrainLabels = np.array(TrainLabels).reshape(-1, 8)
 
     return TrainLabels
 

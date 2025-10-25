@@ -23,7 +23,7 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from torch.optim import AdamW
-from Network.Network import HomographyModel
+from Network.Network_Supervised import HomographyModel, LossFn
 import cv2
 import sys
 import os
@@ -78,11 +78,20 @@ def GenerateBatch(BasePath, DirNamesTrain, TrainCoordinates, ImageSize, MiniBatc
         # Add any standardization or data augmentation here!
         ##########################################################
         I1 = np.float32(cv2.imread(RandImageName))
+        # Convert to grayscale and resize to ImageSize
+        I1 = cv2.cvtColor(I1, cv2.COLOR_BGR2GRAY)
+        I1 = cv2.resize(I1, (ImageSize[0], ImageSize[1]))
+        
+        # For homography estimation, we need 2-channel input (original + warped)
+        # For now, we'll duplicate the grayscale image as both channels
+        # In a real implementation, you'd have the original and warped versions
+        I1_two_channel = np.stack([I1, I1], axis=0)  # Shape: (2, H, W)
+        
         Coordinates = TrainCoordinates[RandIdx]
 
         # Append All Images and Mask
-        I1Batch.append(torch.from_numpy(I1))
-        CoordinatesBatch.append(torch.tensor(Coordinates))
+        I1Batch.append(torch.from_numpy(I1_two_channel).float())
+        CoordinatesBatch.append(torch.tensor(Coordinates).float())
 
     return torch.stack(I1Batch), torch.stack(CoordinatesBatch)
 
@@ -139,7 +148,7 @@ def TrainOperation(
     ###############################################
     # Fill your optimizer of choice here!
     ###############################################
-    Optimizer = ...
+    Optimizer = AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
 
     # Tensorboard
     # Create a summary to monitor loss tensor
@@ -192,11 +201,10 @@ def TrainOperation(
                 )
                 print("\n" + SaveName + " Model Saved...")
 
-            result = model.validation_step(Batch)
-            # Tensorboard
+            # Log training loss to tensorboard
             Writer.add_scalar(
                 "LossEveryIter",
-                result["val_loss"],
+                LossThisBatch.item(),
                 Epochs * NumIterationsPerEpoch + PerEpochCounter,
             )
             # If you don't flush the tensorboard doesn't update until a lot of iterations!
@@ -227,7 +235,7 @@ def main():
     Parser = argparse.ArgumentParser()
     Parser.add_argument(
         "--BasePath",
-        default="/home/lening/workspace/rbe549/YourDirectoryID_p1/Phase2/Data",
+        default="/Users/rohin/Documents/CV/AutoPano/Phase2/Data",
         help="Base path of images, Default:/home/lening/workspace/rbe549/YourDirectoryID_p1/Phase2/Data",
     )
     Parser.add_argument(

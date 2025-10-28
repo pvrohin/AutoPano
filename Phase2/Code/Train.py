@@ -23,7 +23,6 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 from torch.optim import AdamW
-from Network.Network_Supervised import HomographyModel, LossFn
 import cv2
 import sys
 import os
@@ -246,8 +245,8 @@ def main():
 
     Parser.add_argument(
         "--ModelType",
-        default="Unsup",
-        help="Model type, Supervised or Unsupervised? Choose from Sup and Unsup, Default:Unsup",
+        default="Sup",
+        help="Model type, Supervised or Unsupervised? Choose from Sup and Unsup, Default:Sup",
     )
     Parser.add_argument(
         "--NumEpochs",
@@ -288,6 +287,14 @@ def main():
     CheckPointPath = Args.CheckPointPath
     LogsPath = Args.LogsPath
     ModelType = Args.ModelType
+
+    # Dynamically import the appropriate model based on ModelType
+    if ModelType == "Unsup":
+        from Network.Network_Unsupervised import HomographyModel, LossFn
+        print("Using Unsupervised Network")
+    else:  # Default to Supervised
+        from Network.Network_Supervised import HomographyModel, LossFn
+        print("Using Supervised Network")
 
     # Setup all needed parameters including file reading
     (

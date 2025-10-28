@@ -25,11 +25,16 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def LossFn(predictions, labels):
     """
-    Loss function compatible with Train.py supervised learning
-    For unsupervised approach with warped images, see lossFn_warped
+    Loss function that handles both supervised and unsupervised cases
+    For supervised: predictions=H4pt, labels=ground_truth_H4pt
+    For unsupervised: predictions=warped_P_A, labels=P_B
     """
-    criterion = torch.nn.MSELoss()
-    loss = criterion(predictions, labels)
+    if len(predictions.shape) == 4:  # Unsupervised case: warped images
+        # Compare warped P_A with P_B
+        loss = torch.mean(torch.abs(predictions - labels))
+    else:  # Supervised case: H4pt predictions
+        criterion = torch.nn.MSELoss()
+        loss = criterion(predictions, labels)
     return loss
 
 def lossFn_warped(P_B_dash, P_B):
@@ -40,7 +45,14 @@ def lossFn_warped(P_B_dash, P_B):
     return loss
 
 def get_wrapped_images(P_A, H_batch):
-    P_B_dash=HW(128,128)(P_A,H_batch)
+    """
+    Warp image P_A using homography H_batch
+    Input: P_A (batch_size, 1, height, width), H_batch (batch_size, 3, 3)
+    Output: warped image (batch_size, 1, height, width)
+    """
+    # Create HomographyWarper for the patch size
+    warper = HW(height=128, width=128)
+    P_B_dash = warper(P_A, H_batch)
     return P_B_dash
 
 
@@ -79,7 +91,7 @@ class HomographyModel(nn.Module):
         
     def forward(self, x):
         """
-        Forward pass compatible with Train.py interface
+        Forward pass for unsupervised homography estimation
         Input: x - 2-channel image batch (batch_size, 2, 128, 128)
         Output: H4pt predictions (batch_size, 8)
         """
@@ -91,6 +103,26 @@ class HomographyModel(nn.Module):
         H4pt = self.model(x)
         
         return H4pt
+    
+    def unsupervised_forward(self, P_A, P_B, C_A):
+        """
+        Full unsupervised pipeline as shown in the architecture diagram
+        Input: P_A, P_B - image patches (batch_size, 1, 128, 128), C_A - corner coordinates (batch_size, 4, 2)
+        Output: warped P_A and H4pt
+        """
+        # Step 1: Homography Net predicts H4pt from combined patches
+        combined = torch.cat([P_A, P_B], dim=1)  # Stack patches: (batch_size, 2, 128, 128)
+        H4pt = self.model(combined)
+        
+        # Step 2: TensorDLT converts H4pt to homography matrix
+        H_batch = tensorDLT(C_A, H4pt)
+        
+        # Step 3: Spatial Transformer Network warps P_A
+        # HomographyWarper expects (batch, channels, height, width)
+        # P_A is (batch_size, 1, 128, 128) which is already correct format
+        P_A_warped = get_wrapped_images(P_A, H_batch)
+        
+        return P_A_warped, H4pt
 
 
 class Net(nn.Module):
